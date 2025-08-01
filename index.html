@@ -35,14 +35,14 @@
         <div class="card p-6 md:p-8">
             <div class="text-center">
                 <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Calculadora de Inflación Interanual</h1>
-                <p class="mt-2 text-gray-600">Consulte la variación del índice de precios para Guyana y Francia (2017-2021).</p>
+                <p class="mt-2 text-gray-600">Consulte la variación del índice de precios para Guyana y Francia.</p>
             </div>
 
             <!-- Formulario de entrada -->
             <form id="inflation-form" class="mt-8 space-y-4 md:space-y-0 md:flex md:items-end md:space-x-4">
                 <div class="flex-grow">
                     <label for="year-input" class="block text-sm font-medium text-gray-700">Año</label>
-                    <input type="number" id="year-input" name="year" placeholder="Ej: 2018" min="2017" max="2021" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input type="number" id="year-input" name="year" placeholder="Ej: 2018" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                 </div>
                 <div class="flex-grow">
                     <label for="month-select" class="block text-sm font-medium text-gray-700">Mes</label>
@@ -80,43 +80,45 @@
         // Almacén de datos para la inflación
         const inflationData = {};
         const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-        // Mapeo de meses en francés a su número correspondiente
-        const monthMap = {
-            'janv.': 1, 'févr.': 2, 'mars': 3, 'avril': 4, 'mai': 5, 'juin': 6,
-            'juil.': 7, 'août': 8, 'sept.': 9, 'oct.': 10, 'nov.': 11, 'déc.': 12
-        };
+        let availableYears = new Set();
 
         /**
          * Parsea el texto del CSV y lo carga en el objeto inflationData.
+         * Esta versión está adaptada al nuevo formato de CSV limpio.
          * @param {string} csvText - El contenido del archivo CSV como texto.
          */
         function parseCSV(csvText) {
-            const lines = csvText.split('\\n').slice(5); // Omitir las primeras 5 filas de encabezado
+            const lines = csvText.split('\\n').slice(1); // Omitir la fila de encabezado
             lines.forEach(line => {
                 const parts = line.split(',');
                 if (parts.length >= 3) {
-                    const dateStr = parts[0].trim();
+                    const dateStr = parts[0].trim(); // Formato: "YYYY-MM-DD"
                     const guyaneValue = parts[1].trim();
                     const franceValue = parts[2].trim();
 
-                    const dateParts = dateStr.split(' ');
-                    if (dateParts.length === 2) {
-                        const monthFR = dateParts[0];
-                        const year = parseInt(dateParts[1], 10);
-                        const month = monthMap[monthFR];
+                    if (dateStr) {
+                        const year = parseInt(dateStr.substring(0, 4), 10);
+                        const key = dateStr.substring(0, 7); // Clave en formato "YYYY-MM"
+                        
+                        availableYears.add(year);
 
-                        if (year && month) {
-                            const key = `${year}-${String(month).padStart(2, '0')}`;
-                            inflationData[key] = {
-                                guyane: guyaneValue ? parseFloat(guyaneValue.replace(',', '.')) : null,
-                                france: franceValue ? parseFloat(franceValue.replace(',', '.')) : null
-                            };
-                        }
+                        inflationData[key] = {
+                            guyane: guyaneValue ? parseFloat(guyaneValue) : null,
+                            france: franceValue ? parseFloat(franceValue) : null
+                        };
                     }
                 }
             });
-            console.log("Datos procesados:", inflationData);
+            
+            // Actualizar los atributos min y max del input de año
+            const yearInput = document.getElementById('year-input');
+            if (availableYears.size > 0) {
+                const minYear = Math.min(...availableYears);
+                const maxYear = Math.max(...availableYears);
+                yearInput.min = minYear;
+                yearInput.max = maxYear;
+                yearInput.placeholder = `Ej: ${minYear}`;
+            }
         }
 
         /**
@@ -195,7 +197,8 @@
         // Event listener para el envío del formulario
         document.getElementById('inflation-form').addEventListener('submit', function(event) {
             event.preventDefault();
-            const year = document.getElementById('year-input').value;
+            const yearInput = document.getElementById('year-input');
+            const year = yearInput.value;
             const month = document.getElementById('month-select').value;
             
             if (!year) {
